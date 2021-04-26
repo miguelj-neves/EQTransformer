@@ -19,6 +19,7 @@ from keras.layers import MaxPooling1D, UpSampling1D, Cropping1D, SpatialDropout1
 from keras.models import Model
 from keras.utils import multi_gpu_model
 from keras.optimizers import Adam
+from keras.models import load_model
 from obspy.signal.trigger import trigger_onset
 import matplotlib
 from tensorflow.python.util import deprecation
@@ -3115,3 +3116,7 @@ class cred2_fn():
 
         return model
 
+def load_eqtmodel(path):
+    model = keras.models.load_model(path)
+    
+    return model
