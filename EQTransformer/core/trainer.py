@@ -24,7 +24,7 @@ import time
 import os
 import shutil
 import multiprocessing
-from .EqT_utils import DataGenerator, _lr_schedule, cred2, PreLoadGenerator, data_reader
+from .EqT_utils import DataGenerator, _lr_schedule, cred2, cred2_fn, PreLoadGenerator, data_reader
 import datetime
 from tqdm import tqdm
 from tensorflow.python.util import deprecation
@@ -63,7 +63,8 @@ def trainer(input_hdf5=None,
             number_of_gpus=4,
             gpuid=None,
             gpu_limit=None,
-            use_multiprocessing=True):
+            use_multiprocessing=True,
+            pre_trained_path=None):
         
     """
     
@@ -229,7 +230,8 @@ def trainer(input_hdf5=None,
     "number_of_gpus": number_of_gpus,           
     "gpuid": gpuid,
     "gpu_limit": gpu_limit,
-    "use_multiprocessing": use_multiprocessing
+    "use_multiprocessing": use_multiprocessing,
+    "pre_trained_path"=pre_path
     }
                        
     def train(args):
@@ -413,7 +415,21 @@ def _build_model(args):
     """       
     
     inp = Input(shape=args['input_dimention'], name='input') 
-    model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
+    #model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
+    #          kernel_size=[11, 9, 7, 7, 5, 5, 3],
+    #          padding=args['padding'],
+    #          activationf =args['activation'],
+    #          cnn_blocks=args['cnn_blocks'],
+    #          BiLSTM_blocks=args['lstm_blocks'],
+    #          drop_rate=args['drop_rate'], 
+    #          loss_weights=args['loss_weights'],
+    #          loss_types=args['loss_types'],
+    #          kernel_regularizer=keras.regularizers.l2(1e-6),
+    #          bias_regularizer=keras.regularizers.l1(1e-4),
+    #          multi_gpu=args['multi_gpu'], 
+    #          gpu_number=args['number_of_gpus'],  
+    #           )(inp)
+    model = cred2_fn(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
               padding=args['padding'],
               activationf =args['activation'],
@@ -426,7 +442,9 @@ def _build_model(args):
               bias_regularizer=keras.regularizers.l1(1e-4),
               multi_gpu=args['multi_gpu'], 
               gpu_number=args['number_of_gpus'],  
-               )(inp)  
+               )(inp)
+    if args["pre_trained_path"] != None:
+            model.load_weights(args["pre_trained_path"])
     model.summary()  
     return model  
     
