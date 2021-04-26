@@ -768,8 +768,3 @@ def _document_training(history, model, start_training, end_training, save_dir, s
         the_file.write('pre_emphasis: '+str(args['pre_emphasis'])+'\n')
             
             
-def _load_eqtmodel(path):
-    from .EqT_utils import SeqSelfAttention
-    model = keras.models.load_model(path)
-    
-    return model
