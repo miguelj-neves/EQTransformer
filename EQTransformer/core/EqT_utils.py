@@ -3115,8 +3115,3 @@ class cred2_fn():
             optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
 
         return model
-
-def load_eqtmodel(path):
-    model = keras.models.load_model(path)
-    
-    return model
