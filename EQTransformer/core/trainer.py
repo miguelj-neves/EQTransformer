@@ -444,9 +444,9 @@ def _build_model(args):
               multi_gpu=args['multi_gpu'], 
               gpu_number=args['number_of_gpus'],  
                )(inp)
-    if args["pre_trained_path"] != None:
-            model.load_weights(args["pre_trained_path"])
-    model.trainable = False
+    #if args["pre_trained_path"] != None:
+    #        model.load_weights(args["pre_trained_path"])
+    #model.trainable = False
     model.summary()  
     return model  
     
