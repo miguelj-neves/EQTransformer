@@ -415,8 +415,14 @@ def _build_model(args):
         
     """       
     
-    inp = Input(shape=args['input_dimention'], name='input') 
-    model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
+    inp = Input(shape=args['input_dimention'], name='input')
+    if args["pre_trained_path"] != None:
+            pmodel.load_weights(args["pre_trained_path"])
+            pmodel.trainable = False
+            
+            model = pmodel(inp,training=False)
+    else:
+            model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
               padding=args['padding'],
               activationf =args['activation'],
@@ -446,7 +452,8 @@ def _build_model(args):
     #           )(inp)
     #if args["pre_trained_path"] != None:
     #        model.load_weights(args["pre_trained_path"])
-    model.trainable = False
+    
+    
     model.summary()  
     return model  
     
