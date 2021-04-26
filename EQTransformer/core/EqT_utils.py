@@ -3115,3 +3115,9 @@ class cred2_fn():
             optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
 
         return model
+    
+def _load_eqtmodel(path):
+    from .EqT_utils import SeqSelfAttention
+    model = keras.models.load_model(path,custom_objects={"SeqSelfAttention": SeqSelfAttention, "FeedForward": FeedForward})
+    
+    return model
