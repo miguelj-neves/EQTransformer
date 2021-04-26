@@ -13,6 +13,7 @@ import keras
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping
 from keras.layers import Input
+from keras.models import load_model
 import tensorflow as tf
 import matplotlib
 matplotlib.use('agg')
@@ -24,7 +25,7 @@ import time
 import os
 import shutil
 import multiprocessing
-from .EqT_utils import DataGenerator, _lr_schedule, cred2, cred2_fn, PreLoadGenerator, data_reader
+from .EqT_utils import DataGenerator, _lr_schedule, cred2, cred2_fn, PreLoadGenerator, data_reader, SeqSelfAttention
 import datetime
 from tqdm import tqdm
 from tensorflow.python.util import deprecation
@@ -765,3 +766,9 @@ def _document_training(history, model, start_training, end_training, save_dir, s
         the_file.write('drop_channel_r: '+str(args['drop_channel_r'])+'\n')            
         the_file.write('scale_amplitude_r: '+str(args['scale_amplitude_r'])+'\n')            
         the_file.write('pre_emphasis: '+str(args['pre_emphasis'])+'\n')
+            
+            
+def _load_eqtmodel(path):
+    model = keras.models.load_model(path)
+    
+    return model
