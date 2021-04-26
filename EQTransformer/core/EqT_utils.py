@@ -3071,7 +3071,7 @@ class cred2_fn():
         norm_layerP, weightdP = SeqSelfAttention(return_attention=True,
                                                  attention_width= 3,
                                                  name='attentionP')(PLSTM)
-        norm_layer.trainable = False
+        norm_layerP.trainable = False
         decoder_P = _decoder_fn([i for i in reversed(self.nb_filters)], 
                             [i for i in reversed(self.kernel_size)], 
                             self.decoder_depth, 
