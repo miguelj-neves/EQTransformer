@@ -446,6 +446,7 @@ def _build_model(args):
                )(inp)
     if args["pre_trained_path"] != None:
             model.load_weights(args["pre_trained_path"])
+    model.trainable = False
     model.summary()  
     return model  
     
