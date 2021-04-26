@@ -2635,6 +2635,21 @@ def _encoder(filter_number, filter_size, depth, drop_rate, ker_regul, bias_regul
         e = MaxPooling1D(2, padding = padding)(e)            
     return(e) 
 
+def _encoder_fn(filter_number, filter_size, depth, drop_rate, ker_regul, bias_regul, activation, padding, inpC):
+    ' Returns the encoder that is a combination of residual blocks and maxpooling.'        
+    e = inpC
+    for dp in range(depth):
+        e = Conv1D(filter_number[dp], 
+                   filter_size[dp], 
+                   padding = padding, 
+                   activation = activation,
+                   kernel_regularizer = ker_regul,
+                   bias_regularizer = bias_regul,
+                   )(e)
+        e.trainable = False
+        e = MaxPooling1D(2, padding = padding)(e)            
+    return(e) 
+
 
 def _decoder(filter_number, filter_size, depth, drop_rate, ker_regul, bias_regul, activation, padding, inpC):
     ' Returns the dencoder that is a combination of residual blocks and upsampling. '           
