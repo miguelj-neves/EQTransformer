@@ -432,7 +432,7 @@ def _build_model(args):
               gpu_number=args['number_of_gpus'],  
                )(inp)
             model.load_weights(args["pre_trained_path"], by_name=True)
-            #pmodel.trainable = False
+            model.trainable = False
             
             #model = pmodel(inp,training=False)
     else:
