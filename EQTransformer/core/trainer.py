@@ -417,6 +417,20 @@ def _build_model(args):
     
     inp = Input(shape=args['input_dimention'], name='input')
     if args["pre_trained_path"] != None:
+            pmodel = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
+              kernel_size=[11, 9, 7, 7, 5, 5, 3],
+              padding=args['padding'],
+              activationf =args['activation'],
+              cnn_blocks=args['cnn_blocks'],
+              BiLSTM_blocks=args['lstm_blocks'],
+              drop_rate=args['drop_rate'], 
+              loss_weights=args['loss_weights'],
+              loss_types=args['loss_types'],
+              kernel_regularizer=keras.regularizers.l2(1e-6),
+              bias_regularizer=keras.regularizers.l1(1e-4),
+              multi_gpu=args['multi_gpu'], 
+              gpu_number=args['number_of_gpus'],  
+               )(inp)
             pmodel.load_weights(args["pre_trained_path"])
             pmodel.trainable = False
             
