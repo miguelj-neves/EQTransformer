@@ -231,7 +231,7 @@ def trainer(input_hdf5=None,
     "gpuid": gpuid,
     "gpu_limit": gpu_limit,
     "use_multiprocessing": use_multiprocessing,
-    "pre_trained_path"=pre_path
+    "pre_trained_path": pre_trained_path
     }
                        
     def train(args):
