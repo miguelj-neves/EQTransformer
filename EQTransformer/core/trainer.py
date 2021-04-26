@@ -417,7 +417,7 @@ def _build_model(args):
     
     inp = Input(shape=args['input_dimention'], name='input')
     if args["pre_trained_path"] != None:
-            pmodel = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
+            model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
               padding=args['padding'],
               activationf =args['activation'],
@@ -431,10 +431,10 @@ def _build_model(args):
               multi_gpu=args['multi_gpu'], 
               gpu_number=args['number_of_gpus'],  
                )(inp)
-            pmodel.load_weights(args["pre_trained_path"])
-            pmodel.trainable = False
+            model.load_weights(args["pre_trained_path"], by_name=True)
+            #pmodel.trainable = False
             
-            model = pmodel(inp,training=False)
+            #model = pmodel(inp,training=False)
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
