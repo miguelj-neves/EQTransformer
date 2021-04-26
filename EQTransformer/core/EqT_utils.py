@@ -3118,6 +3118,6 @@ class cred2_fn():
     
 def _load_eqtmodel(path):
     from .EqT_utils import SeqSelfAttention
-    model = keras.models.load_model(path,custom_objects={"SeqSelfAttention": SeqSelfAttention, "FeedForward": FeedForward})
+    model = keras.models.load_model(path,custom_objects={"SeqSelfAttention": SeqSelfAttention, "FeedForward": FeedForward,"LayerNormalization":LayerNormalization})
     
     return model
