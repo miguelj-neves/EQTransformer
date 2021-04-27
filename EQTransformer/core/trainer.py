@@ -417,7 +417,12 @@ def _build_model(args):
     
     inp = Input(shape=args['input_dimention'], name='input')
     if args["pre_trained_path"] != None:
-            model = load_model(args["pre_trained_path"])
+            model = load_model(args["pre_trained_path"], 
+                               custom_objects={'SeqSelfAttention': SeqSelfAttention, 
+                                               'FeedForward': FeedForward, 
+                                               'LayerNormalization': LayerNormalization, 
+                                               'f1': f1
+                                              }))
             model.trainable = False
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
