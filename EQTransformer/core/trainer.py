@@ -421,8 +421,7 @@ def _build_model(args):
                                custom_objects={'SeqSelfAttention': SeqSelfAttention, 
                                                'FeedForward': FeedForward, 
                                                'LayerNormalization': LayerNormalization, 
-                                               'f1': f1
-                                              }))
+                                               'f1': f1})
             model.trainable = False
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
