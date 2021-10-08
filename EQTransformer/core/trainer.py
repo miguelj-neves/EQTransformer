@@ -9,11 +9,12 @@ last update: 06/25/2020
 """
 
 from __future__ import print_function
-import keras
-from keras import backend as K
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping
-from keras.layers import Input
-from keras.models import load_model
+import tensorflow.keras as keras
+from  tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
 import matplotlib
 matplotlib.use('agg')
@@ -25,10 +26,12 @@ import time
 import os
 import shutil
 import multiprocessing
-from .EqT_utils import DataGenerator, _lr_schedule, cred2, cred2_fn, PreLoadGenerator, data_reader, SeqSelfAttention, FeedForward, LayerNormalization, f1
+from .EqT_utils import DataGenerator, _lr_schedule, cred2, PreLoadGenerator, data_reader, SeqSelfAttention, FeedForward, LayerNormalization, f1
 import datetime
 from tqdm import tqdm
 from tensorflow.python.util import deprecation
+import csv
+import pickle
 deprecation._PRINT_DEPRECATION_WARNINGS = False
 
 
@@ -65,7 +68,9 @@ def trainer(input_hdf5=None,
             gpuid=None,
             gpu_limit=None,
             use_multiprocessing=True,
-            pre_trained_path=None):
+            pre_trained_path=None,
+            initial_lr=0.001,
+            change_layers=None):
         
     """
     
@@ -170,7 +175,16 @@ def trainer(input_hdf5=None,
         Set the maximum percentage of memory usage for the GPU.
         
     use_multiprocessing: bool, default=True
-        If True, multiple CPUs will be used for the preprocessing of data even when GPU is used for the prediction. 
+        If True, multiple CPUs will be used for the preprocessing of data even when GPU is used for the prediction.
+
+    pre_trained_path: str, default=None
+        Path to pre-trained for transfer learning.
+
+    initial_lr: float, default=0.01
+        Initial learning rate. If doing fine-tuning small learning rates shoudl be used.
+
+    change_layers: list, default=None
+        Index of layers to be used in training. All other layers will be fixed.
 
     Returns
     -------- 
@@ -232,7 +246,9 @@ def trainer(input_hdf5=None,
     "gpuid": gpuid,
     "gpu_limit": gpu_limit,
     "use_multiprocessing": use_multiprocessing,
-    "pre_trained_path": pre_trained_path
+    "pre_trained_path": pre_trained_path,
+    "initial_lr": initial_lr,
+    "change_layers":change_layers
     }
                        
     def train(args):
@@ -325,7 +341,7 @@ def trainer(input_hdf5=None,
                                           workers=multiprocessing.cpu_count(),    
                                           callbacks=callbacks, 
                                           epochs=args['epochs'],
-                                          class_weight={0: 0.11, 1: 0.89})
+                                          class_weight={'detector': 0.11, 'picker_P': 0.89,'picker_S': 0.89})
             
         elif args['mode'] == 'preload': 
             X, y1, y2, y3 = data_reader(list_IDs=training+validation, 
@@ -349,7 +365,7 @@ def trainer(input_hdf5=None,
                                 validation_split=args['train_valid_test_split'][1],
                                 batch_size=args['batch_size'], 
                                 callbacks=callbacks,
-                                class_weight={0: 0.11, 1: 0.89})            
+                                class_weight={'detector': 0.11, 'picker_P': 0.89,'picker_S': 0.89})            
         else:
             print('Please specify training_mode !', flush=True)
         end_training = time.time()  
@@ -422,7 +438,15 @@ def _build_model(args):
                                                'FeedForward': FeedForward, 
                                                'LayerNormalization': LayerNormalization, 
                                                'f1': f1})
-            model.trainable = False
+            if change_layers != None:
+                i = 0
+                for layer in model.layers:
+                    if i in change_layers:
+                        model.trainable = True
+                    else:
+                        model.trainable = False
+                    i = i + 1
+            model.compile(loss=args['loss_types'], loss_weights=args['loss_weights'],optimizer=Adam(lr=_lr_schedule(0,initial_lr)), metrics=[f1])
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
@@ -436,7 +460,8 @@ def _build_model(args):
               kernel_regularizer=keras.regularizers.l2(1e-6),
               bias_regularizer=keras.regularizers.l1(1e-4),
               multi_gpu=args['multi_gpu'], 
-              gpu_number=args['number_of_gpus'],  
+              gpu_number=args['number_of_gpus'],
+              initial_lr=args['initial_lr'],
                )(inp)
     
     model.summary()  
@@ -510,7 +535,7 @@ def _make_callback(args, save_models):
                                  mode='auto',
                                  verbose=1,
                                  save_best_only=True)  
-    lr_scheduler=LearningRateScheduler(_lr_schedule)
+    lr_scheduler=LearningRateScheduler(_lr_schedule(0,initial_lr))
 
     lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
                                    cooldown=0,

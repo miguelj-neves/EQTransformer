@@ -2747,10 +2747,10 @@ def _decoder_fn(filter_number, filter_size, depth, drop_rate, ker_regul, bias_re
         d.trainable = False
     return(d) 
 
-def _lr_schedule(epoch):
+def _lr_schedule(epoch,initial_lr=0.001):
     ' Learning rate is scheduled to be reduced after 40, 60, 80, 90 epochs.'
     
-    lr = 1e-3
+    lr = initial_lr
     if epoch > 90:
         lr *= 0.5e-3
     elif epoch > 60:
@@ -2838,7 +2838,8 @@ class cred2():
                  kernel_regularizer=keras.regularizers.l1(1e-4),
                  bias_regularizer=keras.regularizers.l1(1e-4),
                  multi_gpu=False, 
-                 gpu_number=4, 
+                 gpu_number=4,
+                 initial_lr=0.001, 
                  ):
         
         self.kernel_size = kernel_size
@@ -2856,6 +2857,7 @@ class cred2():
         self.bias_regularizer = bias_regularizer 
         self.multi_gpu = multi_gpu
         self.gpu_number = gpu_number
+        self.initial_lr = initial_lr
 
         
     def __call__(self, inp):
@@ -2937,190 +2939,11 @@ class cred2():
             model = Model(inputs=inp, outputs=[d, P, S])
 
         model.compile(loss=self.loss_types, loss_weights=self.loss_weights,    
-            optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
+            optimizer=Adam(lr=_lr_schedule(0,self.initial_lr)), metrics=[f1])
 
         return model
 
         
-class cred2_fn():
-    
-    """ 
-    
-    Creates the model
-    
-    Parameters
-    ----------
-    nb_filters: list
-        The list of filter numbers. 
-        
-    kernel_size: list
-        The size of the kernel to use in each convolutional layer.
-        
-    padding: str
-        The padding to use in the convolutional layers.
-
-    activationf: str
-        Activation funciton type.
-
-    endcoder_depth: int
-        The number of layers in the encoder.
-        
-    decoder_depth: int
-        The number of layers in the decoder.
-
-    cnn_blocks: int
-        The number of residual CNN blocks.
-
-    BiLSTM_blocks: int=
-        The number of Bidirectional LSTM blocks.
-  
-    drop_rate: float 
-        Dropout rate.
-
-    loss_weights: list
-        Weights of the loss function for the detection, P picking, and S picking.       
-                
-    loss_types: list
-        Types of the loss function for the detection, P picking, and S picking. 
-
-    kernel_regularizer: str
-        l1 norm regularizer.
-
-    bias_regularizer: str
-        l1 norm regularizer.
-
-    multi_gpu: bool
-        If use multiple GPUs for the training. 
-
-    gpu_number: int
-        The number of GPUs for the muli-GPU training. 
-           
-    Returns
-    ----------
-        The complied model: keras model
-        
-    """
-
-    def __init__(self,
-                 nb_filters=[8, 16, 16, 32, 32, 96, 96, 128],
-                 kernel_size=[11, 9, 7, 7, 5, 5, 3, 3],
-                 padding='same',
-                 activationf='relu',
-                 endcoder_depth=7,
-                 decoder_depth=7,
-                 cnn_blocks=5,
-                 BiLSTM_blocks=3,
-                 drop_rate=0.1,
-                 loss_weights=[0.2, 0.3, 0.5],
-                 loss_types=['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'],                                 
-                 kernel_regularizer=keras.regularizers.l1(1e-4),
-                 bias_regularizer=keras.regularizers.l1(1e-4),
-                 multi_gpu=False, 
-                 gpu_number=4, 
-                 ):
-        
-        self.kernel_size = kernel_size
-        self.nb_filters = nb_filters
-        self.padding = padding
-        self.activationf = activationf
-        self.endcoder_depth= endcoder_depth
-        self.decoder_depth= decoder_depth
-        self.cnn_blocks= cnn_blocks
-        self.BiLSTM_blocks= BiLSTM_blocks     
-        self.drop_rate= drop_rate
-        self.loss_weights= loss_weights  
-        self.loss_types = loss_types       
-        self.kernel_regularizer = kernel_regularizer     
-        self.bias_regularizer = bias_regularizer 
-        self.multi_gpu = multi_gpu
-        self.gpu_number = gpu_number
-
-        
-    def __call__(self, inp):
-
-        x = inp
-        x = _encoder_fn(self.nb_filters, 
-                    self.kernel_size, 
-                    self.endcoder_depth, 
-                    self.drop_rate, 
-                    self.kernel_regularizer, 
-                    self.bias_regularizer,
-                    self.activationf, 
-                    self.padding,
-                    x)    
-        
-        for cb in range(self.cnn_blocks):
-            x = _block_CNN_1_fn(self.nb_filters[6], 3, self.drop_rate, self.activationf, self.padding, x)
-            if cb > 2:
-                x = _block_CNN_1_fn(self.nb_filters[6], 2, self.drop_rate, self.activationf, self.padding, x)
-
-        for bb in range(self.BiLSTM_blocks):
-            x = _block_BiLSTM_fn(self.nb_filters[1], self.drop_rate, self.padding, x)
-
-            
-        x, weightdD0 = _transformer_fn(self.drop_rate, None, 'attentionD0', x)             
-        encoded, weightdD = _transformer_fn(self.drop_rate, None, 'attentionD', x)             
-            
-        decoder_D = _decoder_fn([i for i in reversed(self.nb_filters)], 
-                             [i for i in reversed(self.kernel_size)], 
-                             self.decoder_depth, 
-                             self.drop_rate, 
-                             self.kernel_regularizer, 
-                             self.bias_regularizer,
-                             self.activationf, 
-                             self.padding,                             
-                             encoded)
-        d = Conv1D(1, 11, padding = self.padding, activation='sigmoid', name='detector')(decoder_D)
-        d.trainable = False
-
-        PLSTM = LSTM(self.nb_filters[1], return_sequences=True, dropout=self.drop_rate, recurrent_dropout=self.drop_rate)(encoded)
-        PLSTM.trainable = False
-        norm_layerP, weightdP = SeqSelfAttention(return_attention=True,
-                                                 attention_width= 3,
-                                                 name='attentionP')(PLSTM)
-        norm_layerP.trainable = False
-        decoder_P = _decoder_fn([i for i in reversed(self.nb_filters)], 
-                            [i for i in reversed(self.kernel_size)], 
-                            self.decoder_depth, 
-                            self.drop_rate, 
-                            self.kernel_regularizer, 
-                            self.bias_regularizer,
-                            self.activationf, 
-                            self.padding,                            
-                            norm_layerP)
-        P = Conv1D(1, 11, padding = self.padding, activation='sigmoid', name='picker_P')(decoder_P)
-        P.trainable = False
-        SLSTM = LSTM(self.nb_filters[1], return_sequences=True, dropout=self.drop_rate, recurrent_dropout=self.drop_rate)(encoded)
-        SLSTM.trainable = False
-        norm_layerS, weightdS = SeqSelfAttention(return_attention=True,
-                                                 attention_width= 3,
-                                                 name='attentionS')(SLSTM)
-        norm_layerS.trainable = False
-        
-        
-        decoder_S = _decoder_fn([i for i in reversed(self.nb_filters)], 
-                            [i for i in reversed(self.kernel_size)],
-                            self.decoder_depth, 
-                            self.drop_rate, 
-                            self.kernel_regularizer, 
-                            self.bias_regularizer,
-                            self.activationf, 
-                            self.padding,                            
-                            norm_layerS) 
-        
-        S = Conv1D(1, 11, padding = self.padding, activation='sigmoid', name='picker_S')(decoder_S)
-        S.trainable = False
-
-        if self.multi_gpu == True:
-            parallel_model = Model(inputs=inp, outputs=[d, P, S])
-            model = multi_gpu_model(parallel_model, gpus=self.gpu_number)
-        else:
-            model = Model(inputs=inp, outputs=[d, P, S])
-
-        model.compile(loss=self.loss_types, loss_weights=self.loss_weights,    
-            optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
-
-        return model
     
 def _load_eqtmodel(path):
     from .EqT_utils import SeqSelfAttention

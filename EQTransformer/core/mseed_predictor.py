@@ -7,6 +7,10 @@ Created on Sun Jun 21 21:55:54 2020
 
 last update: 01/29/2021
 
+Altered by Miguel Neves
+- Allow the use of different sampling rates in prediction. Still using 600 points windows.
+- Functions changed: mseed_predictor, _mseed2nparry, _plotter_prediction, _resampling, _output_writter_prediction
+
 """
 
 from __future__ import print_function
@@ -323,7 +327,7 @@ def mseed_predictor(input_dir='downloads_mseeds',
                 if (len(matches) >= 1) and ((matches[list(matches)[0]][3] or matches[list(matches)[0]][6])):
                     snr = [_get_snr(data_set[meta["trace_start_time"][ix]], matches[list(matches)[0]][3], window = 100), _get_snr(data_set[meta["trace_start_time"][ix]], matches[list(matches)[0]][6], window = 100)]
                     pre_write = len(detection_memory)
-                    detection_memory=_output_writter_prediction(meta, predict_writer, csvPr_gen, matches, snr, detection_memory, ix)
+                    detection_memory=_output_writter_prediction(meta, predict_writer, csvPr_gen, matches, snr, detection_memory, ix, sprate)
                     post_write = len(detection_memory)
                     if plt_n < args['number_of_plots'] and post_write > pre_write:
                         _plotter_prediction(data_set[meta["trace_start_time"][ix]], args, save_figs, predD[ix][:, 0], predP[ix][:, 0], predS[ix][:, 0], meta["trace_start_time"][ix], matches, sprate)
@@ -584,7 +588,10 @@ def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detect
         Estimated signal to noise ratios for picked P and S phases.   
     
     detection_memory : list
-        Keep the track of detected events.          
+        Keep the track of detected events.
+
+    sprate: int
+        data sampling rate for plots.          
         
     Returns
     -------   
