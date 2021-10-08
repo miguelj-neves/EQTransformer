@@ -438,10 +438,10 @@ def _build_model(args):
                                                'FeedForward': FeedForward, 
                                                'LayerNormalization': LayerNormalization, 
                                                'f1': f1})
-            if change_layers != None:
+            if args['change_layers'] != None:
                 i = 0
                 for layer in model.layers:
-                    if i in change_layers:
+                    if i in args['change_layers']:
                         model.trainable = True
                     else:
                         model.trainable = False
