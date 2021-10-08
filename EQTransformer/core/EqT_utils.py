@@ -2747,10 +2747,10 @@ def _decoder_fn(filter_number, filter_size, depth, drop_rate, ker_regul, bias_re
         d.trainable = False
     return(d) 
 
-def _lr_schedule(epoch,initial_lr=0.001):
+def _lr_schedule(epoch):
     ' Learning rate is scheduled to be reduced after 40, 60, 80, 90 epochs.'
     
-    lr = initial_lr
+    lr = 1e-3
     if epoch > 90:
         lr *= 0.5e-3
     elif epoch > 60:
@@ -2838,8 +2838,7 @@ class cred2():
                  kernel_regularizer=keras.regularizers.l1(1e-4),
                  bias_regularizer=keras.regularizers.l1(1e-4),
                  multi_gpu=False, 
-                 gpu_number=4,
-                 initial_lr=0.001, 
+                 gpu_number=4, 
                  ):
         
         self.kernel_size = kernel_size
@@ -2857,7 +2856,6 @@ class cred2():
         self.bias_regularizer = bias_regularizer 
         self.multi_gpu = multi_gpu
         self.gpu_number = gpu_number
-        self.initial_lr = initial_lr
 
         
     def __call__(self, inp):
@@ -2939,7 +2937,7 @@ class cred2():
             model = Model(inputs=inp, outputs=[d, P, S])
 
         model.compile(loss=self.loss_types, loss_weights=self.loss_weights,    
-            optimizer=Adam(lr=_lr_schedule(0,self.initial_lr)), metrics=[f1])
+            optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
 
         return model
 

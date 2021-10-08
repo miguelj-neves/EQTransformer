@@ -69,7 +69,6 @@ def trainer(input_hdf5=None,
             gpu_limit=None,
             use_multiprocessing=True,
             pre_trained_path=None,
-            initial_lr=0.001,
             change_layers=None):
         
     """
@@ -180,9 +179,6 @@ def trainer(input_hdf5=None,
     pre_trained_path: str, default=None
         Path to pre-trained for transfer learning.
 
-    initial_lr: float, default=0.01
-        Initial learning rate. If doing fine-tuning small learning rates shoudl be used.
-
     change_layers: list, default=None
         Index of layers to be used in training. All other layers will be fixed.
 
@@ -247,7 +243,6 @@ def trainer(input_hdf5=None,
     "gpu_limit": gpu_limit,
     "use_multiprocessing": use_multiprocessing,
     "pre_trained_path": pre_trained_path,
-    "initial_lr": initial_lr,
     "change_layers":change_layers
     }
                        
@@ -446,7 +441,7 @@ def _build_model(args):
                     else:
                         model.trainable = False
                     i = i + 1
-            model.compile(loss=args['loss_types'], loss_weights=args['loss_weights'],optimizer=Adam(lr=_lr_schedule(0,args['initial_lr'])), metrics=[f1])
+            model.compile(loss=args['loss_types'], loss_weights=args['loss_weights'],optimizer=Adam(lr=_lr_schedule(0)), metrics=[f1])
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
@@ -461,7 +456,6 @@ def _build_model(args):
               bias_regularizer=keras.regularizers.l1(1e-4),
               multi_gpu=args['multi_gpu'], 
               gpu_number=args['number_of_gpus'],
-              initial_lr=args['initial_lr'],
                )(inp)
     
     model.summary()  
@@ -535,7 +529,7 @@ def _make_callback(args, save_models):
                                  mode='auto',
                                  verbose=1,
                                  save_best_only=True)  
-    lr_scheduler=LearningRateScheduler(_lr_schedule(0,args['initial_lr']))
+    lr_scheduler=LearningRateScheduler(_lr_schedule)
 
     lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
                                    cooldown=0,
