@@ -341,7 +341,7 @@ def trainer(input_hdf5=None,
                                           workers=multiprocessing.cpu_count(),    
                                           callbacks=callbacks, 
                                           epochs=args['epochs'],
-                                          class_weight={'detector': 0.11, 'picker_P': 0.89,'picker_S': 0.89})
+                                          class_weight={0: 0.11, 1: 0.89})
             
         elif args['mode'] == 'preload': 
             X, y1, y2, y3 = data_reader(list_IDs=training+validation, 
