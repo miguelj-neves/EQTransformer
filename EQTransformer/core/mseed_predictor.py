@@ -11,9 +11,11 @@ last update: 01/29/2021
 
 from __future__ import print_function
 from __future__ import division
-from keras import backend as K
-from keras.models import load_model
-from keras.optimizers import Adam
+
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import Adam
+
 import tensorflow as tf
 import matplotlib
 matplotlib.use('agg')
@@ -22,10 +24,10 @@ import numpy as np
 import pandas as pd
 import math
 import csv
-import keras
+import tensorflow.keras as keras
 import time
 from os import listdir
-import os
+import os, glob, gc
 import platform
 import shutil
 from tqdm import tqdm
@@ -73,6 +75,7 @@ def mseed_predictor(input_dir='downloads_mseeds',
               overlap = 0.3,
               gpuid=None,
               gpu_limit=None,
+              sampling_rate=100,
               overwrite=False): 
     
     """ 
@@ -127,7 +130,10 @@ def mseed_predictor(input_dir='downloads_mseeds',
         Id of GPU used for the prediction. If using CPU set to None.        
              
     gpu_limit: int
-       Set the maximum percentage of memory usage for the GPU. 
+       Set the maximum percentage of memory usage for the GPU.
+
+    sampling_rate: int, default 100
+        Indicate desired sampling rate of the data to be used for detection. Waveforms with different sampling rates will be interpolated to this value. 
 
     overwrite: Bolean, default=False
         Overwrite your results automatically.
@@ -163,7 +169,8 @@ def mseed_predictor(input_dir='downloads_mseeds',
     "overlap": overlap,
     "batch_size": batch_size,    
     "gpuid": gpuid,
-    "gpu_limit": gpu_limit 
+    "gpu_limit": gpu_limit,
+    "sampling_rate": sprate 
     }        
         
     if args['gpuid']:     
@@ -301,7 +308,7 @@ def mseed_predictor(input_dir='downloads_mseeds',
         for _, month in enumerate(uni_list):
             eqt_logger.info(f"{month}")
             matching = [s for s in file_list if month in s]
-            meta, time_slots, comp_types, data_set = _mseed2nparry(args, matching, time_slots, comp_types, st)
+            meta, time_slots, comp_types, data_set = _mseed2nparry(args, matching, time_slots, comp_types, st, sprate)
 
             params_pred = {'batch_size': args['batch_size'],
                            'norm_mode': args['normalization_mode']}  
@@ -319,7 +326,7 @@ def mseed_predictor(input_dir='downloads_mseeds',
                     detection_memory=_output_writter_prediction(meta, predict_writer, csvPr_gen, matches, snr, detection_memory, ix)
                     post_write = len(detection_memory)
                     if plt_n < args['number_of_plots'] and post_write > pre_write:
-                        _plotter_prediction(data_set[meta["trace_start_time"][ix]], args, save_figs, predD[ix][:, 0], predP[ix][:, 0], predS[ix][:, 0], meta["trace_start_time"][ix], matches)
+                        _plotter_prediction(data_set[meta["trace_start_time"][ix]], args, save_figs, predD[ix][:, 0], predP[ix][:, 0], predS[ix][:, 0], meta["trace_start_time"][ix], matches, sprate)
                         plt_n += 1            
                                                        
         end_Predicting = time.time() 
@@ -369,7 +376,7 @@ def mseed_predictor(input_dir='downloads_mseeds',
        
         
         
-def _mseed2nparry(args, matching, time_slots, comp_types, st_name):
+def _mseed2nparry(args, matching, time_slots, comp_types, st_name,sprate):
     ' read miniseed files and from a list of string names and returns 3 dictionaries of numpy arrays, meta data, and time slice info'
     
     json_file = open(args['stations_json'])
@@ -386,18 +393,18 @@ def _mseed2nparry(args, matching, time_slots, comp_types, st_name):
         try:
             temp_st.merge(fill_value=0)                     
         except Exception:
-            temp_st =_resampling(temp_st)
+            temp_st =_resampling(temp_st,sprate)
             temp_st.merge(fill_value=0) 
         temp_st.detrend('demean')
         st += temp_st
                
-    st.filter(type='bandpass', freqmin = 1.0, freqmax = 45, corners=2, zerophase=True)
+    st.filter(type='bandpass', freqmin = 1.0, freqmax = 0.9*sprate/2, corners=2, zerophase=True)
     st.taper(max_percentage=0.001, type='cosine', max_length=2) 
-    if len([tr for tr in st if tr.stats.sampling_rate != 100.0]) != 0:
+    if len([tr for tr in st if tr.stats.sampling_rate != sprate]) != 0:
         try:
-            st.interpolate(100, method="linear")
+            st.interpolate(sprate, method="linear")
         except Exception:
-            st=_resampling(st)            
+            st=_resampling(st,sprate)            
                     
     st.trim(min([tr.stats.starttime for tr in st]), max([tr.stats.endtime for tr in st]), pad=True, fill_value=0)
 
@@ -411,8 +418,8 @@ def _mseed2nparry(args, matching, time_slots, comp_types, st_name):
                 
     chanL = [tr.stats.channel[-1] for tr in st]
     comp_types.append(len(chanL))
-    tim_shift = int(60-(args['overlap']*60))
-    next_slice = start_time+60  
+    tim_shift = int(6000/sprate-(args['overlap']*6000/sprate))
+    next_slice = start_time+6000/sprate  
     
     data_set={}
                 
@@ -553,7 +560,7 @@ class PreLoadGeneratorTest(keras.utils.Sequence):
         return X      
     
 
-def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detection_memory, idx):
+def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detection_memory, idx, sprate):
     
     """ 
     
@@ -616,8 +623,8 @@ def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detect
         return new_t
             
     for match, match_value in matches.items():
-        ev_strt = start_time+timedelta(seconds= match/100)
-        ev_end = start_time+timedelta(seconds= match_value[0]/100)
+        ev_strt = start_time+timedelta(seconds= match/sprate)
+        ev_end = start_time+timedelta(seconds= match_value[0]/sprate)
         
         doublet = [ st for st in detection_memory if abs((st-ev_strt).total_seconds()) < 2]
         
@@ -625,7 +632,7 @@ def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detect
             det_prob = round(match_value[1], 2)
                        
             if match_value[3]: 
-                p_time = start_time+timedelta(seconds= match_value[3]/100)
+                p_time = start_time+timedelta(seconds= match_value[3]/sprate)
             else:
                 p_time = None
             p_prob = match_value[4]
@@ -634,7 +641,7 @@ def _output_writter_prediction(meta, predict_writer, csvPr, matches, snr, detect
                 p_prob = round(p_prob, 2)
                 
             if match_value[6]:
-                s_time = start_time+timedelta(seconds= match_value[6]/100)
+                s_time = start_time+timedelta(seconds= match_value[6]/sprate)
             else:
                 s_time = None
             s_prob = match_value[7]               
@@ -968,18 +975,18 @@ def _picker(args, yh1, yh2, yh3):
 
 
 
-def _resampling(st):
+def _resampling(st,sprate):
     'perform resampling on Obspy stream objects'
     
-    need_resampling = [tr for tr in st if tr.stats.sampling_rate != 100.0]
+    need_resampling = [tr for tr in st if tr.stats.sampling_rate != sprate]
     if len(need_resampling) > 0:
        # print('resampling ...', flush=True)    
         for indx, tr in enumerate(need_resampling):
-            if tr.stats.delta < 0.01:
-                tr.filter('lowpass',freq=45,zerophase=True)
-            tr.resample(100)
-            tr.stats.sampling_rate = 100
-            tr.stats.delta = 0.01
+            if tr.stats.delta < 1/sprate:
+                tr.filter('lowpass',freq=0.9*sprate/2,zerophase=True)
+            tr.resample(sprate)
+            tr.stats.sampling_rate = sprate
+            tr.stats.delta = 1/sprate
             tr.data.dtype = 'int32'
             st.remove(tr)                    
             st.append(tr) 
@@ -1024,7 +1031,7 @@ def _normalize(data, mode = 'max'):
 
 
 
-def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches):
+def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches, sprate):
 
     """ 
     
@@ -1054,7 +1061,10 @@ def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches):
         S arrival probabilities.  
 
     matches: dic
-        Contains the information for the detected and picked event. 
+        Contains the information for the detected and picked event.
+
+    sprate: int
+        data sampling rate for plots. 
                   
         
     """  
@@ -1129,7 +1139,7 @@ def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches):
             plt.axis('off')
         
         ax = fig.add_subplot(spec5[1, 0])         
-        f, t, Pxx = signal.stft(data[:, 0], fs=100, nperseg=80)
+        f, t, Pxx = signal.stft(data[:, 0], fs=sprate, nperseg=80)
         Pxx = np.abs(Pxx)                       
         plt.pcolormesh(t, f, Pxx, alpha=None, cmap='hot', shading='flat', antialiased=True)
         plt.ylim(0, 40)
@@ -1167,7 +1177,7 @@ def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches):
     
     
         ax = fig.add_subplot(spec5[3, 0]) 
-        f, t, Pxx = signal.stft(data[:, 1], fs=100, nperseg=80)
+        f, t, Pxx = signal.stft(data[:, 1], fs=sprate, nperseg=80)
         Pxx = np.abs(Pxx)                       
         plt.pcolormesh(t, f, Pxx, alpha=None, cmap='hot', shading='flat', antialiased=True)
         plt.ylim(0, 40)
@@ -1205,7 +1215,7 @@ def _plotter_prediction(data, args, save_figs, yh1, yh2, yh3, evi, matches):
             plt.axis('off')        
     
         ax = fig.add_subplot(spec5[5, 0])         
-        f, t, Pxx = signal.stft(data[:, 2], fs=100, nperseg=80)
+        f, t, Pxx = signal.stft(data[:, 2], fs=sprate, nperseg=80)
         Pxx = np.abs(Pxx)                       
         plt.pcolormesh(t, f, Pxx, alpha=None, cmap='hot', shading='flat', antialiased=True)
         plt.ylim(0, 40)

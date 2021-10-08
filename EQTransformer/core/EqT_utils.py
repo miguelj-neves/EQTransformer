@@ -5,6 +5,10 @@ Created on Wed Jul 24 19:16:51 2019
 
 @author: mostafamousavi
 last update: 06/06/2020
+
+
+Altered by Miguel Neves
+- Allow start training with pretrained model and fine-tune with new dataset
 """
 from __future__ import division, print_function
 import numpy as np
@@ -12,14 +16,16 @@ import h5py
 import matplotlib
 matplotlib.use('agg')
 from tqdm import tqdm
-import keras
-from keras import backend as K
-from keras.layers import add, Activation, LSTM, Conv1D
-from keras.layers import MaxPooling1D, UpSampling1D, Cropping1D, SpatialDropout1D, Bidirectional, BatchNormalization 
-from keras.models import Model
-from keras.utils import multi_gpu_model
-from keras.optimizers import Adam
-from keras.models import load_model
+
+import tensorflow.keras as keras
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import add, Activation, LSTM, Conv1D, InputSpec
+from tensorflow.keras.layers import MaxPooling1D, UpSampling1D, Cropping1D, SpatialDropout1D, Bidirectional, BatchNormalization
+from tensorflow.keras.models import Model
+#from tensorflow.keras.utils import multi_gpu_model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
+
 from obspy.signal.trigger import trigger_onset
 import matplotlib
 from tensorflow.python.util import deprecation
@@ -218,7 +224,7 @@ class DataGenerator(keras.utils.Sequence):
         return data  
     
     def _add_noise(self, data, snr, rate):
-        'Randomly add Gaussian noie with a random SNR into waveforms'
+        'Randomly add Gaussian noise with a random SNR into waveforms'
         
         data_noisy = np.empty((data.shape))
         if np.random.uniform(0, 1) < rate and all(snr >= 10.0): 
@@ -231,7 +237,7 @@ class DataGenerator(keras.utils.Sequence):
         return data_noisy   
          
     def _adjust_amplitude_for_multichannels(self, data):
-        'Adjust the amplitude of multichaneel data'
+        'Adjust the amplitude of multichannel data'
         
         tmp = np.max(np.abs(data), axis=0, keepdims=True)
         assert(tmp.shape[-1] == data.shape[-1])
@@ -240,7 +246,7 @@ class DataGenerator(keras.utils.Sequence):
         return data
 
     def _label(self, a=0, b=20, c=40):  
-        'Used for triangolar labeling'
+        'Used for triangular labeling'
         
         z = np.linspace(a, c, num = 2*(b-a)+1)
         y = np.zeros(z.shape)
