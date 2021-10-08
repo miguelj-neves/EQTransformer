@@ -446,7 +446,7 @@ def _build_model(args):
                     else:
                         model.trainable = False
                     i = i + 1
-            model.compile(loss=args['loss_types'], loss_weights=args['loss_weights'],optimizer=Adam(lr=_lr_schedule(0,initial_lr)), metrics=[f1])
+            model.compile(loss=args['loss_types'], loss_weights=args['loss_weights'],optimizer=Adam(lr=_lr_schedule(0,args['initial_lr'])), metrics=[f1])
     else:
             model = cred2(nb_filters=[8, 16, 16, 32, 32, 64, 64],
               kernel_size=[11, 9, 7, 7, 5, 5, 3],
@@ -535,7 +535,7 @@ def _make_callback(args, save_models):
                                  mode='auto',
                                  verbose=1,
                                  save_best_only=True)  
-    lr_scheduler=LearningRateScheduler(_lr_schedule(0,initial_lr))
+    lr_scheduler=LearningRateScheduler(_lr_schedule(0,args['initial_lr']))
 
     lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
                                    cooldown=0,
